@@ -23,17 +23,6 @@ function createElement(type, props, ...children) {
   };
 }
 
-function render(el, container) {
-  nextWorkOfUnit = {
-    dom: container,
-    props: {
-      children: [el],
-    },
-  };
-
-  root = nextWorkOfUnit;
-}
-
 function createDom(work) {
   return work.type === 'TEXT_ELEMENT'
     ? document.createTextNode('')
@@ -64,7 +53,7 @@ function updateProps(dom, nextProps, prevProps = {}) {
   });
 }
 
-function initChildren(fiber, children) {
+function reconcileChildren(fiber, children) {
   let oldFiber = fiber.alternate?.child;
   let prevSibling = null;
 
@@ -111,7 +100,7 @@ function initChildren(fiber, children) {
 
 function updateFunctionComponent(fiber) {
   const children = [fiber.type(fiber.props)];
-  initChildren(fiber, children);
+  reconcileChildren(fiber, children);
 }
 
 function updateHostComponent(fiber) {
@@ -119,7 +108,7 @@ function updateHostComponent(fiber) {
     const dom = (fiber.dom = createDom(fiber));
     updateProps(dom, fiber.props);
   }
-  initChildren(fiber, fiber.props.children);
+  reconcileChildren(fiber, fiber.props.children);
 }
 
 function performWorkOfUnit(fiber) {
@@ -143,9 +132,9 @@ function performWorkOfUnit(fiber) {
 }
 
 function commitRoot() {
-  commitWork(root.child);
-  currentRoot = root;
-  root = null;
+  commitWork(wipRoot.child);
+  currentRoot = wipRoot;
+  wipRoot = null;
 }
 
 function commitWork(fiber) {
@@ -166,7 +155,7 @@ function commitWork(fiber) {
   commitWork(fiber.sibling);
 }
 
-let root = null;
+let wipRoot = null;
 let currentRoot = null;
 let nextWorkOfUnit = null;
 function workLoop(deadline) {
@@ -177,7 +166,7 @@ function workLoop(deadline) {
     shouldYield = deadline.timeRemaining() < 1;
   }
 
-  if (!nextWorkOfUnit && root) {
+  if (!nextWorkOfUnit && wipRoot) {
     commitRoot();
   }
 
@@ -185,14 +174,25 @@ function workLoop(deadline) {
 }
 requestIdleCallback(workLoop);
 
+function render(el, container) {
+  wipRoot = {
+    dom: container,
+    props: {
+      children: [el],
+    },
+  };
+
+  nextWorkOfUnit = wipRoot;
+}
+
 function update() {
-  nextWorkOfUnit = {
+  wipRoot = {
     dom: currentRoot.dom,
     props: currentRoot.props,
     alternate: currentRoot,
   };
 
-  root = nextWorkOfUnit;
+  nextWorkOfUnit = wipRoot;
 }
 
 const React = {
